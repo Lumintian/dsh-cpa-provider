@@ -1,0 +1,47 @@
+# Example for $DSH_HOME/profiles/<profile>/cordis.patch.yml.
+# A patch entry replaces the row's whole config, so keep every field you use
+# (instances, models, …) in this one entry.
+
+- id: cpa-provider
+  config:
+    instances:
+      - id: home                        # provider route: cpa-home
+        name: 家用 CPA                   # group name in the model picker
+        baseURL: http://127.0.0.1:8317
+        fast: [gpt-5.5]                 # models with Fast (service_tier: priority)
+        # apiKeyEnv: CPA_HOME_API_KEY   # default; store it with /cpa-key home <key>
+      - id: backup
+        name: 备用 CPA
+        baseURL: https://cpa.example.com
+        apiKeyEnv: MY_BACKUP_CPA_KEY
+        fast: []
+
+    # Ordered rules: every matching rule applies, later ones override earlier ones.
+    models:
+      # All GPT models: offer low / medium / xhigh / max, default to xhigh.
+      - match: '/^gpt-/i'
+        efforts: [low, medium, xhigh, max]
+        defaultEffort: xhigh
+
+      # GPT-6-Luna is more specific: only low and max, default low.
+      - match: gpt-6-luna
+        efforts: [low, max]
+        defaultEffort: low
+
+      # Only on the backup instance: a smaller context window.
+      - match: 'cpa-backup/*'
+        contextWindow: 128000
+
+      # Drop a model from the list entirely.
+      # - match: 'gpt-reserve'
+      #   hidden: true
+
+    refreshIntervalMinutes: 10
+    showHiddenModels: false
+
+# Optional: make a CPA model the default for new sessions (the model picker
+# also saves your choice).
+# - id: agent-default-model
+#   config:
+#     provider: cpa-home
+#     model: gpt-5.5

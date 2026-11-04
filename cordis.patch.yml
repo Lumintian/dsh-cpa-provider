@@ -1,0 +1,8 @@
+# Layer applied when a dsh profile lists this bundle. Configure the row from
+# your profile's own cordis.patch.yml (same id), or with the /cpa-* commands.
+- insert:
+    - id: cpa-provider
+      name: '@lumintian/dsh-cpa-provider'
+      config:
+        instances: []
+        models: []
