@@ -29,6 +29,10 @@ export interface EffectiveModel {
   /** Selectable dsh levels, lowest first; empty means the model is not a reasoning model. */
   levels: ThinkingLevel[]
   defaultLevel?: ThinkingLevel
+  /** Every level the CPA catalog offers for this model, before rules narrow it. */
+  offeredLevels: ThinkingLevel[]
+  /** The catalog's own default level, when it maps to a dsh level. */
+  catalogDefault?: ThinkingLevel
   contextWindow: number
   maxTokens: number
   input: Modality[]
@@ -151,9 +155,9 @@ export function resolveModel(
     if (levels.includes(merged.defaultEffort)) defaultLevel = merged.defaultEffort
     else if (levels.length > 0) warnings.push(`defaultEffort "${merged.defaultEffort}" 不在可选档位里（${levels.join(', ')}），已改用 CPA 默认值`)
   }
-  if (defaultLevel === undefined && catalog.defaultEffort !== undefined) {
-    const fromCatalog = levelFromCatalog(catalog.defaultEffort)
-    if (fromCatalog !== undefined && levels.includes(fromCatalog)) defaultLevel = fromCatalog
+  const catalogDefault = catalog.defaultEffort === undefined ? undefined : levelFromCatalog(catalog.defaultEffort)
+  if (defaultLevel === undefined && catalogDefault !== undefined && levels.includes(catalogDefault)) {
+    defaultLevel = catalogDefault
   }
 
   return {
@@ -161,6 +165,8 @@ export function resolveModel(
     name: catalog.name,
     levels,
     ...defaultLevel === undefined ? {} : { defaultLevel },
+    offeredLevels: offered,
+    ...catalogDefault === undefined ? {} : { catalogDefault },
     contextWindow: merged.contextWindow ?? catalog.contextWindow ?? FALLBACK_CONTEXT_WINDOW,
     maxTokens: merged.maxTokens ?? catalog.maxTokens ?? FALLBACK_MAX_TOKENS,
     input: merged.input ?? [...catalog.input],

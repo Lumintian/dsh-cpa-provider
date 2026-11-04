@@ -146,7 +146,18 @@ async function boot(config: Record<string, unknown>, keys: Record<string, string
     assert.ok(command, `command /${name} is registered`)
     return await command.handler({ rawInput, agent: { session: { requestContext: () => requestContext } } })
   }
-  return { ctx, update, run, credentials, entry, dispose: () => ctx.fiber.dispose() }
+  /** Install a scripted user-questions service; it records what each card asked and who asked it. */
+  const answerCards = (reply: (questions: Array<{ id: string; options?: Array<{ label: string }> }>) => Array<{ id: string; selected: string[]; custom?: string }>) => {
+    const asked: Array<{ agent: unknown; questions: Array<{ id: string; question: string }> }> = []
+    ctx.provide('userQuestions', {
+      ask: async (request: { agent: unknown; questions: Array<{ id: string; question: string; options?: Array<{ label: string }> }> }) => {
+        asked.push(request)
+        return { answers: reply(request.questions) }
+      },
+    } as never)
+    return asked
+  }
+  return { ctx, update, run, credentials, entry, answerCards, dispose: () => ctx.fiber.dispose() }
 }
 
 async function until(check: () => boolean | Promise<boolean>, what: string): Promise<void> {
@@ -261,6 +272,23 @@ test('a missing key keeps the route empty until /cpa-key stores one', async () =
     assert.equal(removed.kind, 'success', removed.text)
     await until(() => !ctx.llm.listProviders().some(provider => provider.id === 'cpa-backup'), 'the route to go away')
     assert.equal(app.credentials.values.has('CPA_BACKUP_API_KEY'), false)
+  } finally {
+    await app.dispose()
+  }
+})
+
+test('commands ask through the user-questions service with the invoking agent', async () => {
+  const app = await boot({ instances: [{ id: 'home', baseURL, fast: [] }] }, { CPA_HOME_API_KEY: KEY })
+  try {
+    await until(async () => (await app.ctx.llm.listModels('cpa-home')).length > 0, 'the catalog to load')
+    const asked = app.answerCards(questions => questions.map(question => ({ id: question.id, selected: [question.options![0]!.label] })))
+    const context = { provider: 'cpa-home', model: 'gpt-6-luna' }
+    const result = await app.run('cpa-fast', '', context)
+    assert.equal(result.kind, 'success', result.text)
+    assert.match(result.text!, /^✓ Fast：已开启 cpa-home\/gpt-6-luna/, 'the current model is listed first')
+    assert.equal(asked.length, 1)
+    assert.deepEqual((asked[0]!.agent as { session: { requestContext: () => unknown } }).session.requestContext(), context)
+    await until(async () => (await app.ctx.llm.listModels('cpa-home')).some(model => model.name === 'GPT-6-Luna · Fast'), 'Fast to apply')
   } finally {
     await app.dispose()
   }
