@@ -9,6 +9,7 @@ const effective: EffectiveModel = {
   name: 'GPT-5.5',
   levels: ['low', 'xhigh'],
   defaultLevel: 'xhigh',
+  offeredLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
   contextWindow: 500000,
   maxTokens: 128000,
   input: ['text', 'image'],

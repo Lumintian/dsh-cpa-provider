@@ -30,6 +30,7 @@ import type {} from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-commands'
 import type {} from '@deepseek-ai/dsh-fs'
 import type {} from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-user-questions'
 
 import type { Context, VolatileSnapshot } from '@deepseek-ai/cordis'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
@@ -39,6 +40,7 @@ import { resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
 import type { AdapterRegistrationHandle } from '@deepseek-ai/dsh-llm'
 import type { AuthContext, CredentialStore } from '@earendil-works/pi-ai'
 import { CpaAdapter } from './adapter.ts'
+import { askVia } from './ask.ts'
 import { type CommandHost, createCommands, type CurrentRoute } from './commands.ts'
 import { Config, type InstanceConfig, type ModelRule } from './config.ts'
 import { CpaRuntime, type RuntimeSettings, STARTUP_CACHE_FRESH_MS } from './runtime.ts'
@@ -205,16 +207,20 @@ export function apply(ctx: Context, config: Config): void {
 
   void runtime.refreshAll({ freshMs: STARTUP_CACHE_FRESH_MS })
 
+  const writeSection = async (field: 'instances' | 'models', value: unknown): Promise<void> => {
+    const settings = ctx.get('settings')
+    if (settings === undefined) {
+      throw new Error(`当前组合没有设置服务，请直接编辑 profile 的 cordis.patch.yml 中 id 为 ${settingsNs} 的条目`)
+    }
+    await settings.mutate(settingsNs, [{ op: 'set', path: [field], value }])
+  }
+
   const host: CommandHost = {
     runtime,
     readInstances: () => plainInstances(config.instances.get()),
-    writeInstances: async (next) => {
-      const settings = ctx.get('settings')
-      if (settings === undefined) {
-        throw new Error(`当前组合没有设置服务，请直接编辑 profile 的 cordis.patch.yml 中 id 为 ${settingsNs} 的条目`)
-      }
-      await settings.mutate(settingsNs, [{ op: 'set', path: ['instances'], value: next }])
-    },
+    writeInstances: async (next) => { await writeSection('instances', next) },
+    readRules: () => plainRules(config.models.get()),
+    writeRules: async (next) => { await writeSection('models', next) },
     setKey: async (ref, value) => {
       const credentials = ctx.get('credentials')
       if (credentials === undefined) throw new Error(`当前组合没有凭据存储，请改用环境变量 ${ref}`)
@@ -242,10 +248,14 @@ export function apply(ctx: Context, config: Config): void {
           description: command.description,
           ...command.hint === undefined ? {} : { input: { hint: command.hint } },
           ...command.recordInput === undefined ? {} : { recordInput: command.recordInput },
-          handler: async ({ agent, rawInput }) => {
+          handler: async ({ agent, rawInput, signal }) => {
             const context = agent.session.requestContext()
             const current: CurrentRoute | undefined = context ? { provider: context.provider, model: context.model } : undefined
-            return await command.run(rawInput, current)
+            return await command.run({
+              args: rawInput,
+              ...current ? { current } : {},
+              ask: askVia(ctx.get('userQuestions'), agent, signal),
+            })
           },
         })
       }

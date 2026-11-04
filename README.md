@@ -14,48 +14,55 @@
 
 需要 dsh 0.2.1-rc.5+（Node 24.9+）和可用的 CPA 实例。
 
-发布到 npm 之后：
-
 ```bash
 dsh plugin --profile web add @lumintian/dsh-cpa-provider
 ```
 
-在本地源码上安装：
+升级到最新版用同一条命令，加上 `@latest`：
 
 ```bash
-pnpm install && pnpm build
-```
-
-```bash
-dsh plugin --profile web add /path/to/dsh-cpa-provider
+dsh plugin --profile web add @lumintian/dsh-cpa-provider@latest
 ```
 
 `--profile` 写你启动 dsh 时用的 profile。dsh 的每种界面默认用各自的 profile：`dsh web` 用 `web`，`dsh headless` 用 `headless`，`dsh acp` 用 `acp`。每个 profile 都要单独安装本插件、单独配置。
 
-## 快速开始（Web / CLI）
+## 快速开始（Web）
 
-在会话输入框里依次执行：
+在输入框里输入 `/cpa`，**先按 Esc 关掉命令菜单再回车**（原因见下文「Web 使用须知」），会弹出操作菜单：
 
-```text
-/cpa-add home http://127.0.0.1:8317 家用 CPA
-/cpa-key home sk-你的CPA密钥
-/cpa
-```
+1. 选「添加实例」，依次填地址、名称、实例 ID、API key；
+2. 打开输入框右下角的模型选择器，会多出你刚起名的那一组，选一个模型；
+3. 发一句话（比如「你好」）开始对话。
 
-之后模型选择器里会出现「家用 CPA」这一组，选模型即可。`/cpa-key` 的输入不会记入会话日志，不过输入时屏幕上是明文；不想这样的话，可以改用环境变量 `CPA_HOME_API_KEY`。
+之后随时输入 `/cpa` 打开菜单，开关 Fast、设置模型思考强度、刷新目录都在里面。
+
+每个命令都可以不带参数，缺什么就弹出卡片问什么；熟悉之后也可以一次写全，例如 `/cpa-add http://127.0.0.1:8317 家用 CPA`。
+
+## Web 使用须知
+
+这几条是 dsh Web 界面本身的行为，插件这边改变不了：
+
+- **还没聊过天的新会话里，命令结果不显示。** 命令其实已经执行了，弹出的提问卡片也照常显示，只是最后的结果文字要等会话里有了第一条消息才会出现（之前的结果会一起补上）。所以执行完 `/cpa-add` 后，直接去模型选择器看有没有新分组就行。
+- **输入命令后直接回车，会选中命令菜单里高亮的那一项。** 比如输入 `/cpa` 时菜单默认高亮的是 `cpa-add`，回车就变成了 `/cpa-add`。想执行自己输入的内容，先按 Esc 关掉菜单再回车；或者用方向键在菜单里选。
+- **命令结果默认只显示第一行**，点一下这一行可以展开看全部内容。本插件所有结果的第一行都是一句话总结。
+- **只有一道题的卡片，选完要点「提交」**；多道题的卡片，单选题选完会自动跳到下一题。卡片里输入的内容不会记进会话日志，但输入时屏幕上是明文。
+- 卡片等待回答时如果关掉或刷新页面，这次命令会被取消，不会做任何修改。
 
 ## 命令
 
-只有交互界面（Web、CLI）能用斜杠命令。ACP、headless、SDK 请直接编辑配置文件（见下文），key 用环境变量提供。
+只有交互界面（Web、CLI）能用斜杠命令。ACP、headless、SDK 请直接编辑配置文件（见下文），key 用环境变量提供。在不能弹出卡片的界面里，命令需要把参数写全。
 
-| 命令 | 作用 |
-|---|---|
-| `/cpa [实例]` | 查看实例、key 状态、模型数、Fast 和规则提示；带实例名时列出每个模型的档位、默认值、上下文 |
-| `/cpa-add <实例ID> <地址> [名称]` | 添加实例 |
-| `/cpa-key <实例> <key>` | 把 key 存进 dsh 凭据存储并立即获取目录；`/cpa-key <实例> --clear` 清除 |
-| `/cpa-refresh [实例]` | 重新获取模型目录；不写实例时刷新全部 |
-| `/cpa-fast [on\|off\|status] [实例/模型]` | 开关 Fast；不写模型时作用于当前会话最近一次请求用的模型 |
-| `/cpa-remove <实例>` | 删除实例，同时删掉它的目录缓存和默认凭据 |
+| 命令 | 不带参数时 | 带参数的写法 |
+|---|---|---|
+| `/cpa` | 弹出操作菜单 | `/cpa status` 看总览；`/cpa <实例>` 看该实例每个模型的档位、默认值、上下文 |
+| `/cpa-add` | 依次询问地址、名称、实例 ID、API key | `/cpa-add <地址> <名称>` 直接添加，实例 ID 按地址自动起名（本机地址是 `local`）；只写地址会再问名称、ID 和 key；旧写法 `/cpa-add <ID> <地址> [名称]` 仍可用 |
+| `/cpa-key` | 选择实例（只有一个时跳过），再输入 key | `/cpa-key [实例] <key>`；`/cpa-key <实例> --clear` 清除 |
+| `/cpa-fast` | 列出所有可开 Fast 的模型，勾选的会切换开关；当前会话的模型排在最前 | `/cpa-fast on\|off [实例/模型]`；不写模型时作用于当前会话的模型；`/cpa-fast status` 列出已开启的 |
+| `/cpa-model` | 选择模型，再勾选可选思考强度、选择默认强度 | `/cpa-model <实例/模型>` 直接进入后两步 |
+| `/cpa-refresh` | 刷新全部实例的目录 | `/cpa-refresh <实例>` |
+| `/cpa-remove` | 选择实例并确认 | `/cpa-remove <实例>`（不再确认） |
+
+`/cpa-model` 会在 `models` 规则列表末尾写一条只匹配该实例该模型的规则（`match: cpa-<实例>/<模型>`），所以它优先于你写的通配规则；选「恢复默认」会删掉这条规则。
 
 会改配置的命令会写入 profile 的 `cordis.patch.yml`，效果和手工编辑一样。
 
@@ -151,7 +158,7 @@ $DSH_HOME/cache/dsh-cpa-provider/<id>.json       # 每个实例的目录快照�
 
 ## 限制
 
-- 「设置 → 模型」页面不显示 CPA 实例，请用命令或配置文件管理。如果你只配置了 CPA、没有其他 API key，Web 端的首次引导可能仍会提示登录 DeepSeek 账号。
+- 「设置 → 模型」页面不显示 CPA 实例，请用 `/cpa` 菜单或配置文件管理。如果你只配置了 CPA、没有其他 API key，Web 端的首次引导可能仍会提示登录 DeepSeek 账号。
 - Fast 作用于该模型的所有请求，包括 dsh 自己发起的辅助请求（例如生成会话标题）。
 - 插件复用 `@deepseek-ai/dsh-llm-pi-ai` 导出的 `PiAiAdapter`。dsh 还在 developer preview 阶段，大版本升级时可能需要跟着调整；已在 0.2.1-rc.5 和 0.2.2-rc.1 上测试。
 - 只走 `/v1/responses`，不支持 Chat Completions 或 Codex WebSocket 传输。
@@ -163,5 +170,7 @@ pnpm install
 pnpm check   # tsc + node --test（需要 Node 24）
 pnpm build   # 输出到 lib/
 ```
+
+发布新版本：先改 `package.json` 的 `version`，并在 [CHANGELOG.md](./CHANGELOG.md) 写清改动，然后运行 `pnpm publish`。发布前会自动跑 `pnpm check` 并构建 `lib/`。
 
 `tests/plugin.e2e.test.ts` 会在真实的 Cordis + dsh LLM 运行时里挂载插件，连到一个模拟的 CPA HTTP 服务，验证目录、规则、默认强度、请求体里的 Fast 和热更新。
