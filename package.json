@@ -1,6 +1,6 @@
 {
   "name": "@lumintian/dsh-cpa-provider",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "DeepSeek Harness provider plugin for CLIProxyAPI (CPA): automatic model catalog, per-model reasoning rules, and per-model Fast.",
   "author": "Lumintian",
   "license": "MIT",

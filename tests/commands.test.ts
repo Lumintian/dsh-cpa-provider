@@ -31,7 +31,7 @@ function scripted(steps: Step[], seen: Question[][] = []): Ask {
 
 const noCards: Ask = async () => { throw new AskUnavailable() }
 
-async function setup(options: { instances?: InstanceConfig[]; rules?: ModelRule[]; keys?: Record<string, string> } = {}) {
+async function setup(options: { instances?: InstanceConfig[]; rules?: ModelRule[]; keys?: Record<string, string>; catalog?: unknown } = {}) {
   let instances = options.instances ?? []
   let rules = options.rules ?? []
   const keys = new Map(Object.entries(options.keys ?? {}))
@@ -39,7 +39,7 @@ async function setup(options: { instances?: InstanceConfig[]; rules?: ModelRule[
     cacheDir: mkdtempSync(join(tmpdir(), 'cpa-commands-')),
     resolveKey: async ref => keys.get(ref),
     logger: { warn: () => {} },
-    fetch: (async () => new Response(JSON.stringify(CPA_CATALOG))) as unknown as typeof globalThis.fetch,
+    fetch: (async () => new Response(JSON.stringify(options.catalog ?? CPA_CATALOG))) as unknown as typeof globalThis.fetch,
   })
   const sync = () => runtime.applySettings({ instances, rules, showHidden: false, fetchTimeoutMs: 1000 })
   sync()
@@ -240,4 +240,21 @@ test('closing a card cancels without changes; missing UI explains the argument f
   const headless = await app.run('cpa-key', '', noCards)
   assert.equal(headless.kind, 'error')
   assert.match(headless.text, /用法：\/cpa-key/)
+})
+
+test('model arguments accept CPA-prefixed ids, with or without the instance', async () => {
+  const fast = [{ id: 'priority' }]
+  const catalog = { models: [
+    { slug: 'gpt-6-luna', display_name: 'GPT 6.0 Luna', service_tiers: fast },
+    { slug: 'api/gpt-6-luna', display_name: 'gpt-6-luna', service_tiers: fast },
+    { slug: 'team/gpt-6-luna', display_name: 'GPT 6.0 Luna', service_tiers: fast },
+  ] }
+  const app = await setup({ instances: [HOME], keys: { CPA_HOME_API_KEY: 'k' }, catalog })
+  assert.match((await app.run('cpa-fast', 'on api/gpt-6-luna', noCards)).text, /^✓ Fast：已开启/)
+  assert.match((await app.run('cpa-fast', 'on home/team/gpt-6-luna', noCards)).text, /^✓ Fast：已开启/)
+  assert.match((await app.run('cpa-fast', 'on cpa-home/gpt-6-luna', noCards)).text, /^✓ Fast：已开启/)
+  assert.deepEqual(app.instances()[0]!.fast, ['api/gpt-6-luna', 'team/gpt-6-luna', 'gpt-6-luna'])
+  const missing = await app.run('cpa-fast', 'on nope/gpt-6-luna', noCards)
+  assert.equal(missing.kind, 'error')
+  assert.match(missing.text, /没有 CPA 实例 nope/)
 })

@@ -110,7 +110,7 @@ dsh plugin --profile web add @lumintian/dsh-cpa-provider@latest
 
 | 字段 | 说明 |
 |---|---|
-| `match` | 必填。通配符：`*` 匹配任意字符，不区分大小写，要整串匹配，例如 `gpt-*`、`gpt-6-luna`。正则：写成 `/表达式/标志`，例如 `/^gpt-/i`。同时用 `模型ID` 和 `cpa-<实例>/模型ID` 去匹配，所以 `cpa-backup/*` 只作用于一个实例 |
+| `match` | 必填。通配符：`*` 匹配任意字符，不区分大小写，要整串匹配，例如 `gpt-*`、`gpt-6-luna`。正则：写成 `/表达式/标志`，例如 `/^gpt-/i`。同时用 `模型ID` 和 `cpa-<实例>/模型ID` 去匹配，所以 `cpa-backup/*` 只作用于一个实例。带 CPA 前缀的模型（如 `api/gpt-6-luna`）还会用去掉前缀的 `gpt-6-luna` 匹配，所以写基础模型的规则也作用于它的前缀别名；`api/*` 可以只选某个前缀 |
 | `efforts` | 可选的思考强度：`off`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max`。**只能从 CPA 为该模型提供的档位里挑**，写了 CPA 没有的档位会被忽略，并在 `/cpa` 里提示 |
 | `defaultEffort` | 切换到该模型时预选的强度，也是请求没指定强度时发送的强度。不写或不可选时，用 CPA 目录给的默认值 |
 | `contextWindow` | 上下文窗口（token）。默认用 CPA 目录的 `context_window` |
@@ -127,6 +127,10 @@ dsh plugin --profile web add @lumintian/dsh-cpa-provider@latest
 | `refreshIntervalMinutes` | `10` | 后台刷新目录的间隔，`0` 关闭定时刷新 |
 | `fetchTimeoutMs` | `15000` | 获取目录的超时 |
 | `showHiddenModels` | `false` | 显示 CPA 标为隐藏的模型（图片、视频和内部模型） |
+
+### 模型前缀
+
+CPA 给凭据配置了 `prefix` 时，模型 ID 会带上前缀，例如 `api/gpt-6-luna`、`team/gpt-6-luna`。插件原样注册这些 ID，请求里发送的也是完整 ID。选择器里的显示名会补上前缀（CPA 目录里别名的显示名和基础模型一样），所以同一个模型的几个前缀版本能区分开。命令里可以直接写 `api/gpt-6-luna`，也可以写 `<实例>/api/gpt-6-luna`。
 
 ## Fast 怎么工作
 
@@ -168,6 +172,8 @@ $DSH_HOME/cache/dsh-cpa-provider/<id>.json       # 每个实例的目录快照�
 ```bash
 pnpm install
 pnpm check   # tsc + node --test（需要 Node 24）
+# 可选：对真实 CPA 跑端到端（会产生少量用量；走代理时加 NODE_USE_ENV_PROXY=1）
+CPA_LIVE_URL=https://cpa.example.com CPA_LIVE_KEY=sk-... node --test tests/live.e2e.test.ts
 pnpm build   # 输出到 lib/
 ```
 

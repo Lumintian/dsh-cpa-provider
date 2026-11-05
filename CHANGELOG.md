@@ -1,5 +1,14 @@
 # 更新记录
 
+## 0.2.1
+
+支持 CPA 的模型前缀（凭据上配置了 `prefix` 时，模型 ID 形如 `api/gpt-6-luna`）：
+
+- 模型选择器里带前缀的模型显示名也带上前缀，例如 `team/GPT 6.0 Luna`。CPA 会把基础模型的显示名原样复制给每个带前缀的别名，之前 `gpt-6-luna`、`api/gpt-6-luna`、`team/gpt-6-luna` 在选择器里看起来一模一样。
+- `models` 规则写基础模型 ID（如 `match: gpt-6-luna`）时，也作用于它带前缀的别名；写成 `cpa-<实例>/<模型>` 的规则（`/cpa-model` 写入的就是这种）仍然只匹配那一个模型。
+- 命令参数可以直接写带前缀的模型 ID：`/cpa-fast on api/gpt-6-luna`、`/cpa-model home/team/gpt-6-luna`。之前会把 `api` 当成实例名，报「没有 CPA 实例 api」。
+- 新增可选的真实 CPA 端到端测试 `tests/live.e2e.test.ts`，设置 `CPA_LIVE_URL`、`CPA_LIVE_KEY` 时才运行。
+
 ## 0.2.0
 
 命令交互整体改版：

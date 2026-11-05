@@ -106,6 +106,32 @@ export function supportsPriorityTier(raw: Raw): boolean {
   })
 }
 
+/**
+ * CPA exposes credentials with a `prefix` as `<prefix>/<model>` (split at the
+ * first `/`, as CPA does). Returns the prefix, or `undefined` for a plain id.
+ */
+export function modelPrefix(id: string): string | undefined {
+  const index = id.indexOf('/')
+  return index > 0 && index < id.length - 1 ? id.slice(0, index) : undefined
+}
+
+/** The model id without its CPA prefix. */
+export function baseModelId(id: string): string {
+  const prefix = modelPrefix(id)
+  return prefix === undefined ? id : id.slice(prefix.length + 1)
+}
+
+/**
+ * CPA copies the base model's `display_name` onto every prefixed alias, so
+ * `gpt-6-luna`, `api/gpt-6-luna` and `team/gpt-6-luna` would all look the
+ * same in the picker. Put the prefix back unless the name already shows it.
+ */
+export function prefixedDisplayName(id: string, name: string): string {
+  const prefix = modelPrefix(id)
+  if (prefix === undefined) return name
+  return name.toLowerCase().startsWith(`${prefix.toLowerCase()}/`) ? name : `${prefix}/${name}`
+}
+
 export function toCatalogModel(raw: Raw): CatalogModel | undefined {
   const id = nonEmptyString(raw.slug, raw.id)
   if (!id) return undefined
@@ -114,7 +140,7 @@ export function toCatalogModel(raw: Raw): CatalogModel | undefined {
   const maxTokens = positiveInt(raw.max_tokens, raw.max_output_tokens, raw.max_completion_tokens)
   return {
     id,
-    name: nonEmptyString(raw.display_name, raw.name) ?? id,
+    name: prefixedDisplayName(id, nonEmptyString(raw.display_name, raw.name) ?? id),
     efforts: reasoningEfforts(raw),
     ...defaultEffort ? { defaultEffort } : {},
     ...contextWindow ? { contextWindow } : {},
