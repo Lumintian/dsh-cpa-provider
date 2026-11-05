@@ -20,6 +20,9 @@ DeepSeek Harness（dsh）的 Cordis 插件：把一个或多个 CLIProxyAPI（CP
 - `src/adapter.ts`：`PiAiAdapter` 子类，补上按模型的 `defaultEffort`，首次使用时等待目录。
 - `src/ask.ts`：提问卡片（`ctx.userQuestions`）的封装：`AskUnavailable`（界面不能弹卡片）与 `AskCancelled`（用户关掉卡片）。
 - `src/commands.ts`：`/cpa*` 命令，通过 `CommandHost` 访问配置和凭据，通过 `Ask` 弹卡片，便于测试。
+- `src/assistant.ts`：给 Agent 用的配置助手（纯函数）：读取现状与目录、预览方案（schema、错误、提醒、逐模型变化）、生成完整的 `cordis.patch.yml` 条目。
+- `src/tool.ts`：`cpa_config` 工具（read / preview / apply）。apply 必须先用卡片请用户确认；不能确认或不能写入时只返回 YAML。
+- `src/skill.ts`：内置技能 `cpa-provider-config` 的正文。改配置语义、命令或字段时同步更新它。
 - `tests/`：单元测试；`commands.test.ts` 用脚本化的卡片回答驱动命令；`plugin.e2e.test.ts` 在真实 Cordis + dsh-llm 运行时里对接模拟 CPA 服务。
 
 ## 必须保持的行为
@@ -31,6 +34,7 @@ DeepSeek Harness（dsh）的 Cordis 插件：把一个或多个 CLIProxyAPI（CP
 5. **复用 dsh 请求链路**：消息转换、工具、图片、回放交给 `PiAiAdapter`，不要自己实现传输。profile 对象里保留新版本 dsh 需要的前向兼容字段。
 6. **热更新**：配置字段都是 volatile；未变化的输入不重建 profile map，变化后通过 `registration.replace()` 通知模型选择器刷新。
 7. **命令交互**：每个命令不带参数也能用，缺的信息用卡片问；不能弹卡片的界面回退到用法说明，参数写法保持兼容。结果第一行必须是一句话总结（dsh Web 只显示第一行）。命令结果文字会写进会话日志，绝不能包含 key。
+8. **Agent 配置助手**：`cpa_config` 只写 `instances` 和 `models`，不读写 key，方案里带疑似密钥字段一律拒绝；apply 写入前必须经过用户卡片确认；输出不得包含 key。
 
 ## 修改与交付
 

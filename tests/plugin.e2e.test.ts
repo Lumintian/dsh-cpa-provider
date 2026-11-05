@@ -130,6 +130,20 @@ async function boot(config: Record<string, unknown>, keys: Record<string, string
       return () => { commands.delete(definition.name) }
     },
   } as never)
+  const skills = new Map<string, { description: string; content: string; source: string }>()
+  ctx.provide('skills', {
+    register: (skill: { name: string; description: string; content: string; source: string }) => {
+      skills.set(skill.name, skill)
+      return () => { skills.delete(skill.name) }
+    },
+  } as never)
+  const tools = new Map<string, { parameters: unknown; execute: (args: unknown, exec: { signal: AbortSignal }) => Promise<unknown> }>()
+  ctx.provide('tools', {
+    register: (tool: { name: string; parameters: unknown; execute: (args: unknown, exec: { signal: AbortSignal }) => Promise<unknown> }) => {
+      tools.set(tool.name, tool)
+      return () => { tools.delete(tool.name) }
+    },
+  } as never)
   await ctx.plugin(Loader)
   ctx.loader.builtins['cpa-under-test'] = plugin
   // The runtime keeps a caller-chosen id (the profile row id); the published type omits it.
@@ -157,7 +171,7 @@ async function boot(config: Record<string, unknown>, keys: Record<string, string
     } as never)
     return asked
   }
-  return { ctx, update, run, credentials, entry, answerCards, dispose: () => ctx.fiber.dispose() }
+  return { ctx, update, run, credentials, entry, answerCards, skills, tools, dispose: () => ctx.fiber.dispose() }
 }
 
 async function until(check: () => boolean | Promise<boolean>, what: string): Promise<void> {
@@ -292,4 +306,37 @@ test('commands ask through the user-questions service with the invoking agent', 
   } finally {
     await app.dispose()
   }
+})
+
+test('the configuration skill and cpa_config tool are registered and use the live setup', async () => {
+  const app = await boot({ instances: [{ id: 'home', name: '家用 CPA', baseURL, fast: [] }], models: RULES }, { CPA_HOME_API_KEY: KEY })
+  try {
+    await until(async () => (await app.ctx.llm.listModels('cpa-home')).length > 0, 'the catalog to load')
+    const skill = app.skills.get('cpa-provider-config')
+    assert.ok(skill, 'the skill is registered')
+    assert.equal(skill.source, 'bundled')
+    assert.match(skill.content, /cpa_config/)
+    const tool = app.tools.get('cpa_config')
+    assert.ok(tool, 'the tool is registered')
+    const exec = { signal: new AbortController().signal }
+    const read = String(await tool.execute({ action: 'read' }, exec))
+    assert.match(read, /## cpa-home（家用 CPA）/)
+    assert.match(read, /gpt-6-luna \| .* \| low\/max \(low\)/)
+    assert.ok(!read.includes(KEY), 'no key in tool output')
+
+    // Without a user-questions service nothing is written; the YAML comes back instead.
+    const models = [...RULES, { match: 'claude-*', hidden: true }]
+    const applied = String(await tool.execute({ action: 'apply', models }, exec))
+    assert.match(applied, /^未应用：这个界面没法请用户确认/)
+    assert.equal((app.entry.options.config as { models: unknown[] }).models.length, RULES.length)
+
+    // With a card the user confirms, the change lands in the plugin's settings and takes effect.
+    app.answerCards(questions => [{ id: questions[0]!.id, selected: ['应用'] }])
+    assert.match(String(await tool.execute({ action: 'apply', models }, exec)), /^✓ 已应用 CPA 配置/)
+    await until(async () => !(await app.ctx.llm.listModels('cpa-home')).some(model => model.id.startsWith('claude-')), 'claude to be hidden')
+  } finally {
+    await app.dispose()
+  }
+  assert.equal(app.tools.size, 0, 'disposal unregisters the tool')
+  assert.equal(app.skills.size, 0, 'disposal unregisters the skill')
 })

@@ -9,7 +9,9 @@ import {
   fetchCatalog,
   isAuthError,
   loadCatalogCache,
+  baseModelId,
   mapCatalog,
+  modelPrefix,
   saveCatalogCache,
 } from '../src/catalog.ts'
 import { CPA_CATALOG } from './fixtures.ts'
@@ -68,4 +70,21 @@ test('cache round-trips per models URL and is private to the user', () => {
   assert.equal(loadCatalogCache(dir, 'other', 'http://a/v1/models'), undefined)
   assert.equal(statSync(join(dir, 'home.json')).mode & 0o077, 0)
   assert.ok(!readFileSync(join(dir, 'home.json'), 'utf8').includes('sk-'))
+})
+
+test('prefixed CPA aliases keep their prefix in the display name', () => {
+  // Shape of a real CPA catalog: aliases copy the base model's display_name.
+  const models = mapCatalog([
+    { slug: 'gpt-6-luna', display_name: 'GPT 6.0 Luna' },
+    { slug: 'api/gpt-6-luna', display_name: 'gpt-6-luna' },
+    { slug: 'team/gpt-6-luna', display_name: 'GPT 6.0 Luna' },
+    { slug: 'team/gpt-6-sol', display_name: 'team/GPT 6.0 Sol' },
+    { slug: 'api/x' },
+  ])
+  assert.deepEqual(models.map(model => model.name), ['GPT 6.0 Luna', 'api/gpt-6-luna', 'team/GPT 6.0 Luna', 'team/GPT 6.0 Sol', 'api/x'])
+  assert.equal(modelPrefix('a/b/c'), 'a', 'CPA splits at the first slash')
+  assert.equal(modelPrefix('/x'), undefined)
+  assert.equal(modelPrefix('x/'), undefined)
+  assert.equal(baseModelId('team/gpt-6-luna'), 'gpt-6-luna')
+  assert.equal(baseModelId('gpt-6-luna'), 'gpt-6-luna')
 })

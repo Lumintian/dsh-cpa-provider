@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { mapCatalog } from '../src/catalog.ts'
 import type { ModelRule } from '../src/config.ts'
-import { compileRules, parseMatch, resolveModel } from '../src/rules.ts'
+import { compileRules, parseMatch, resolveModel, ruleMatches } from '../src/rules.ts'
 import { CPA_CATALOG } from './fixtures.ts'
 
 const catalog = mapCatalog(CPA_CATALOG.models)
@@ -93,4 +93,17 @@ test('capacity, input, and visibility overrides', () => {
   assert.equal(resolveModel(byId('claude-sonnet-4-5'), 'cpa-home', rules).hidden, true)
   assert.equal(resolveModel(byId('gpt-image-2'), 'cpa-home', []).hidden, true)
   assert.equal(resolveModel(byId('gpt-image-2'), 'cpa-home', [], { showHidden: true }).hidden, false)
+})
+
+test('a rule for a base model also covers its CPA-prefixed aliases, but route-qualified rules stay exact', () => {
+  const { rules } = compileRules([
+    rule({ match: 'gpt-6-luna', defaultEffort: 'low' }),
+    rule({ match: 'cpa-home/gpt-6-luna', defaultEffort: 'max' }),
+    rule({ match: 'api/*', input: ['text'] }),
+  ])
+  const matched = (id: string) => rules.filter(compiled => ruleMatches(compiled, 'cpa-home', id)).map(compiled => compiled.index)
+  assert.deepEqual(matched('gpt-6-luna'), [0, 1])
+  assert.deepEqual(matched('api/gpt-6-luna'), [0, 2])
+  assert.deepEqual(matched('team/gpt-6-luna'), [0])
+  assert.deepEqual(matched('team/gpt-6-sol'), [])
 })

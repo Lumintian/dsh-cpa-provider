@@ -169,16 +169,22 @@ function modelOptions(
   }
 }
 
-/** Resolve `cpa-<id>/<model>`, `<id>/<model>`, or a bare model id (unique, or on the current route). */
+/**
+ * Resolve `cpa-<id>/<model>`, `<id>/<model>`, or a bare model id (unique, or
+ * on the current route). A CPA-prefixed id such as `api/gpt-6-luna` is itself
+ * a bare model id, so a leading segment that names no instance falls through
+ * to the bare lookup instead of being reported as an unknown instance.
+ */
 function resolveModelToken(runtime: CpaRuntime, token: string, current: CurrentRoute | undefined): ModelPick | string {
   const views = runtime.views()
   const slash = token.indexOf('/')
-  if (slash > 0) {
-    const route = routeFor(instanceIdOf(token.slice(0, slash)))
-    const view = views.get(route)
-    if (!view) return `没有 CPA 实例 ${token.slice(0, slash)}`
-    const model = view.models.find(item => item.id === token.slice(slash + 1))
-    return model ? { view, model } : `${route} 的目录里没有 ${token.slice(slash + 1)}，可以先 /cpa-refresh`
+  const qualified = slash > 0 ? views.get(routeFor(instanceIdOf(token.slice(0, slash)))) : undefined
+  const bareOwned = [...views.values()].some(view => view.models.some(model => model.id === token))
+  if (slash > 0 && (qualified || !bareOwned)) {
+    if (!qualified) return `没有 CPA 实例 ${token.slice(0, slash)}`
+    const model = qualified.models.find(item => item.id === token.slice(slash + 1))
+    if (model) return { view: qualified, model }
+    if (!bareOwned) return `${qualified.state.route} 的目录里没有 ${token.slice(slash + 1)}，可以先 /cpa-refresh`
   }
   const owners = [...views.values()].filter(view => view.models.some(model => model.id === token))
   const pick = (view: RouteView): ModelPick => ({ view, model: view.models.find(model => model.id === token)! })

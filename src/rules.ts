@@ -8,7 +8,7 @@
  */
 
 import { type ModelRule, type Modality, THINKING_LEVELS, type ThinkingLevel } from './config.ts'
-import { type CatalogModel, FALLBACK_CONTEXT_WINDOW, FALLBACK_MAX_TOKENS } from './catalog.ts'
+import { baseModelId, type CatalogModel, FALLBACK_CONTEXT_WINDOW, FALLBACK_MAX_TOKENS } from './catalog.ts'
 
 export interface CompiledRule {
   index: number
@@ -71,8 +71,17 @@ export function compileRules(rules: readonly ModelRule[]): CompiledRules {
   return { rules: compiled, issues }
 }
 
+/**
+ * A rule sees the model id, `<route>/<model id>`, and, for a CPA-prefixed id
+ * such as `api/gpt-6-luna`, the bare base id `gpt-6-luna` too, so a rule
+ * written for a model also covers its prefixed aliases. `<route>/<base id>` is
+ * deliberately not a candidate: a route-qualified rule (what `/cpa-model`
+ * writes) stays exact.
+ */
 export function ruleMatches(rule: CompiledRule, route: string, modelId: string): boolean {
-  return rule.regex.test(modelId) || rule.regex.test(`${route}/${modelId}`)
+  if (rule.regex.test(modelId) || rule.regex.test(`${route}/${modelId}`)) return true
+  const base = baseModelId(modelId)
+  return base !== modelId && rule.regex.test(base)
 }
 
 /** CPA spells "no reasoning" as `none`; dsh calls it `off`. Unknown levels such as `ultra` have no dsh slot. */
