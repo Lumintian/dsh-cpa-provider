@@ -38,6 +38,21 @@ dsh plugin --profile web add @lumintian/dsh-cpa-provider@latest
 
 每个命令都可以不带参数，缺什么就弹出卡片问什么；熟悉之后也可以一次写全，例如 `/cpa-add http://127.0.0.1:8317 家用 CPA`。
 
+## 让 Agent 帮你配置
+
+插件自带一个技能 `cpa-provider-config` 和一个工具 `cpa_config`，所以可以直接用自然语言提需求，例如：
+
+- 「所有 GPT 模型只保留 low、medium、xhigh，默认 xhigh；gpt-6-luna 默认 low」
+- 「把 grok 和 gemini 的模型都藏起来」
+- 「team 前缀的模型都开 Fast」
+- 「再加一个 CPA，地址 https://cpa.example.com，叫备用」
+
+Agent 会先读取当前配置和每个实例的真实模型目录，起草方案并预览每个模型的变化，然后弹出卡片请你确认，**确认后才写入**，立即生效。
+
+- 工具只改 `instances` 和 `models`，不碰 key。新实例的 key 请用 `/cpa-key` 设置，Agent 会提醒你。
+- 不能弹卡片的界面（headless、ACP）或没有设置服务时不会写入，Agent 会给出完整的 `cordis.patch.yml` 条目，由你替换 profile 里 `id: cpa-provider` 的条目。
+- 不想让 Agent 用这个工具，可以在 dsh 的工具权限里禁用 `cpa_config`。
+
 ## Web 使用须知
 
 这几条是 dsh Web 界面本身的行为，插件这边改变不了：

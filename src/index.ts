@@ -30,6 +30,8 @@ import type {} from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-commands'
 import type {} from '@deepseek-ai/dsh-fs'
 import type {} from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-skill'
+import type {} from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-user-questions'
 
 import type { Context, VolatileSnapshot } from '@deepseek-ai/cordis'
@@ -44,6 +46,8 @@ import { askVia } from './ask.ts'
 import { type CommandHost, createCommands, type CurrentRoute } from './commands.ts'
 import { Config, type InstanceConfig, type ModelRule } from './config.ts'
 import { CpaRuntime, type RuntimeSettings, STARTUP_CACHE_FRESH_MS } from './runtime.ts'
+import { SKILL_CONTENT, SKILL_DESCRIPTION, SKILL_NAME, SKILL_WHEN_TO_USE } from './skill.ts'
+import { configToolDefinition, type ToolHost } from './tool.ts'
 
 export { Config } from './config.ts'
 export type { InstanceConfig, ModelRule, ThinkingLevel } from './config.ts'
@@ -239,6 +243,31 @@ export function apply(ctx: Context, config: Config): void {
       return { configured: value !== undefined && value.length > 0, ...value ? { source: 'environment' } : {} }
     },
   }
+
+  // Agent-facing configuration help: a skill that explains the config and a
+  // tool that reads, previews, and (after the user confirms) applies it.
+  ctx.inject(['skills'], (child) => {
+    child.effect(() => child.skills.register({
+      name: SKILL_NAME,
+      description: SKILL_DESCRIPTION,
+      whenToUse: SKILL_WHEN_TO_USE,
+      content: SKILL_CONTENT,
+      source: 'bundled',
+      provider: name,
+    }), 'cpa-provider-config skill')
+  })
+
+  const toolHost: ToolHost = {
+    ...host,
+    settingsNs,
+    canWrite: () => ctx.get('settings') !== undefined,
+  }
+  ctx.inject(['tools'], (child) => {
+    child.effect(() => child.tools.register(configToolDefinition(
+      toolHost,
+      exec => askVia(ctx.get('userQuestions'), exec.agent, exec.signal),
+    ) as never), 'cpa_config tool')
+  })
 
   ctx.inject(['commands'], (child) => {
     child.effect(function* () {

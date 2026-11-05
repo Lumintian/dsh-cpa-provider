@@ -1,6 +1,17 @@
 # 更新记录
 
-## 0.2.1
+## 0.3.0
+
+让 dsh 的 Agent 直接帮你配置本插件：
+
+- 内置技能 `cpa-provider-config`：说明配置结构、规则语义、模型前缀、Fast 和禁止事项（不写 key、不改实例 id 等）。用户用自然语言提需求（「所有 GPT 默认 xhigh」「把 grok 都藏起来」「team 前缀的模型开 Fast」）时，Agent 会加载它。
+- 新增 Agent 工具 `cpa_config`：
+  - `read`：当前配置 YAML，加上每个实例的真实模型目录（模型 ID、CPA 提供的档位和默认值、生效档位、能否 Fast、命中哪些规则）；
+  - `preview`：检查方案，列出错误、提醒（档位 CPA 没有、Fast 不支持、规则没匹配到模型等）和逐模型的变化，并给出完整的 `cordis.patch.yml` 条目；
+  - `apply`：先弹卡片请你确认，确认后才写入，立即生效。不能弹卡片（headless、ACP）或没有设置服务时不写入，返回完整 YAML 条目，供你手动替换。
+- 方案里出现 `apiKey`、`token` 之类的字段会被拒绝；工具的输出里不含 key。
+
+### 模型前缀
 
 支持 CPA 的模型前缀（凭据上配置了 `prefix` 时，模型 ID 形如 `api/gpt-6-luna`）：
 
